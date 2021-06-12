@@ -950,6 +950,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
+name = "libatrace"
+version = "0.1.0"
+source = "git+https://github.com/Grainspring/libatrace.git#88ff7bccdced295141836f6d0881673796c5c0ce"
+dependencies = [
+ "lazy_static",
+ "libc",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1085,7 +1094,7 @@ dependencies = [
 [[package]]
 name = "mock-tikv"
 version = "0.0.0"
-source = "git+https://github.com/tikv/client-rust.git#89ac804705b7634869aa1b547f87e2e16000d2ba"
+source = "git+https://github.com/Grainspring/client-rust.git#89ac804705b7634869aa1b547f87e2e16000d2ba"
 dependencies = [
  "derive-new",
  "futures 0.3.10",
@@ -1864,6 +1873,7 @@ dependencies = [
  "clap",
  "fuser",
  "futures 0.3.10",
+ "libatrace",
  "libc",
  "lru",
  "paste",
@@ -1874,14 +1884,16 @@ dependencies = [
  "tikv-client",
  "toml",
  "tracing",
+ "tracing-attributes",
  "tracing-futures",
+ "tracing-libatrace",
  "tracing-subscriber",
 ]
 
 [[package]]
 name = "tikv-client"
 version = "0.0.0"
-source = "git+https://github.com/tikv/client-rust.git#89ac804705b7634869aa1b547f87e2e16000d2ba"
+source = "git+https://github.com/Grainspring/client-rust.git#89ac804705b7634869aa1b547f87e2e16000d2ba"
 dependencies = [
  "async-trait",
  "derive-new",
@@ -1907,7 +1919,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-common"
 version = "0.0.0"
-source = "git+https://github.com/tikv/client-rust.git#89ac804705b7634869aa1b547f87e2e16000d2ba"
+source = "git+https://github.com/Grainspring/client-rust.git#89ac804705b7634869aa1b547f87e2e16000d2ba"
 dependencies = [
  "futures 0.3.10",
  "grpcio",
@@ -1921,7 +1933,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-pd"
 version = "0.0.0"
-source = "git+https://github.com/tikv/client-rust.git#89ac804705b7634869aa1b547f87e2e16000d2ba"
+source = "git+https://github.com/Grainspring/client-rust.git#89ac804705b7634869aa1b547f87e2e16000d2ba"
 dependencies = [
  "async-trait",
  "futures 0.3.10",
@@ -1934,7 +1946,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-proto"
 version = "0.0.0"
-source = "git+https://github.com/tikv/client-rust.git#89ac804705b7634869aa1b547f87e2e16000d2ba"
+source = "git+https://github.com/Grainspring/client-rust.git#89ac804705b7634869aa1b547f87e2e16000d2ba"
 dependencies = [
  "futures 0.3.10",
  "grpcio",
@@ -1948,7 +1960,7 @@ dependencies = [
 [[package]]
 name = "tikv-client-store"
 version = "0.0.0"
-source = "git+https://github.com/tikv/client-rust.git#89ac804705b7634869aa1b547f87e2e16000d2ba"
+source = "git+https://github.com/Grainspring/client-rust.git#89ac804705b7634869aa1b547f87e2e16000d2ba"
 dependencies = [
  "async-trait",
  "derive-new",
@@ -2092,6 +2104,18 @@ checksum = "ab7bb6f14721aa00656086e9335d363c5c8747bae02ebe32ea2c7dece5689b4c"
 dependencies = [
  "pin-project 0.4.27",
  "tracing",
+]
+
+[[package]]
+name = "tracing-libatrace"
+version = "0.1.0"
+source = "git+https://github.com/Grainspring/tracing-libatrace.git#18602eef13be8b86ea0adff1583625f2109723c5"
+dependencies = [
+ "libatrace",
+ "tracing",
+ "tracing-core",
+ "tracing-futures",
+ "tracing-subscriber",
 ]
 
 [[package]]

@@ -1,9 +1,10 @@
 use clap::{crate_version, App, Arg};
-use tracing_subscriber::EnvFilter;
 
 use tifs::mount_tifs_daemonize;
 use tifs::MountOption;
 use tracing::{debug, info, trace};
+use tracing_subscriber::{layer::SubscriberExt, registry::Registry};
+use tracing_libatrace as tracing_atrace;
 
 #[async_std::main]
 async fn main() {
@@ -52,10 +53,7 @@ async fn main() {
         )
         .get_matches();
 
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .try_init()
-        .unwrap();
+    setup_global_subscriber();
 
     let serve = matches.is_present("serve");
     let foreground = serve || matches.is_present("foreground");
@@ -208,4 +206,10 @@ async fn main() {
     })
     .await
     .unwrap();
+}
+
+fn setup_global_subscriber() {
+    let layer = tracing_atrace::layer().unwrap().with_data_field(Option::Some("data".to_string()));
+    let subscriber = Registry::default().with(layer);
+    tracing::subscriber::set_global_default(subscriber).unwrap();
 }

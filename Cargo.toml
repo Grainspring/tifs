@@ -20,10 +20,13 @@ lru = "0.6"
 serde = {version = "1", features = ["derive"]}
 slab = "0.4.2"
 thiserror = "1.0"
-tikv-client = {git = "https://github.com/tikv/client-rust.git"}
+tikv-client = {git = "https://github.com/Grainspring/client-rust.git"}
+libatrace = {git = "https://github.com/Grainspring/libatrace.git"}
 toml = "0.5"
+tracing-attributes =  "0.1.2"
 tracing = "0.1"
 tracing-futures = "0.2.4"
+tracing-libatrace = {git = "https://github.com/Grainspring/tracing-libatrace.git"}
 tracing-subscriber = "0.2"
 
 bincode = {version = "1.3.1", optional = true}

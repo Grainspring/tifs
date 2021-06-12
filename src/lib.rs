@@ -1,7 +1,7 @@
 #![feature(map_into_keys_values)]
 #![feature(async_closure)]
 #![feature(array_chunks)]
-
+#![type_length_limit="3831949"]
 pub mod fs;
 
 use async_std::fs::read_to_string;
@@ -338,7 +338,7 @@ where
         Default::default()
     };
 
-    debug!("use tikv client config: {:?}", client_cfg);
+    debug!("mount_tifs, config: {:?}", client_cfg);
     let fs_impl = TiFs::construct(endpoints, client_cfg, options).await?;
 
     make_daemon()?;

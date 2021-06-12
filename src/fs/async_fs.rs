@@ -13,6 +13,10 @@ use fuser::{
     ReplyWrite, ReplyXattr, Request, TimeOrNow,
 };
 use tracing::trace;
+use tracing_subscriber::{prelude::*, registry::Registry};
+use tracing_attributes::instrument;
+use tracing::{span, Level, debug_span};
+use tracing_libatrace::InstrumentExt;
 
 use super::error::{FsError, Result};
 use super::reply::{
@@ -26,8 +30,8 @@ where
     V: Debug,
 {
     spawn(async move {
-        trace!("reply to request({})", id);
         let result = f.await;
+        trace!("reply result to fuser request unique id:{}", id);
         reply.reply(id, result);
     });
 }
@@ -467,36 +471,41 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         let uid = req.uid();
         let gid = req.gid();
 
+        trace!("fs init uid:{}, gid:{}", uid, gid);
         block_on(self.0.init(gid, uid, config)).map_err(|err| err.into())
     }
 
     fn destroy(&mut self, _req: &Request) {
+        trace!("fs destroy");
         block_on(self.0.destroy())
     }
 
     fn lookup(&mut self, req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
         let async_impl = self.0.clone();
         let name = name.to_string_lossy().to_string().into();
+        trace!("fs lookup:{}, req id:{}", name, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.lookup(parent, name).await
+            async_impl.lookup(parent, name).instrument(debug_span!("lookup")).await
         });
     }
 
-    fn forget(&mut self, _req: &Request, ino: u64, nlookup: u64) {
+    fn forget(&mut self, req: &Request, ino: u64, nlookup: u64) {
         let async_impl = self.0.clone();
 
+        trace!("fs forget ino:{}, nlookup:{}, req id:{}", ino, nlookup, req.unique());
         // TODO: union the spawn function for request without reply
         spawn(async move {
-            async_impl.forget(ino, nlookup).await;
+            async_impl.forget(ino, nlookup).instrument(debug_span!("forget")).await;
         });
     }
 
     fn getattr(&mut self, req: &Request, ino: u64, reply: ReplyAttr) {
         let async_impl = self.0.clone();
+        trace!("fs getattr ino:{}, req id:{}", ino, req.unique());
         spawn_reply(
             req.unique(),
             reply,
-            async move { async_impl.getattr(ino).await },
+            async move { async_impl.getattr(ino).instrument(debug_span!("getattr")).await },
         );
     }
 
@@ -519,20 +528,23 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         reply: ReplyAttr,
     ) {
         let async_impl = self.0.clone();
+        trace!("fs setattr ino:{}, req id:{}", ino, req.unique());
         spawn_reply(req.unique(), reply, async move {
             async_impl
                 .setattr(
                     ino, mode, uid, gid, size, atime, mtime, ctime, fh, crtime, chgtime, bkuptime,
                     flags,
                 )
+                .instrument(debug_span!("setattr"))
                 .await
         });
     }
 
     fn readlink(&mut self, req: &Request, ino: u64, reply: ReplyData) {
         let async_impl = self.0.clone();
+        trace!("fs readlink ino:{}, req id:{}", ino, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.readlink(ino).await
+            async_impl.readlink(ino).instrument(debug_span!("readlink")).await
         });
     }
 
@@ -551,9 +563,11 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         let uid = req.uid();
         let gid = req.gid();
 
+        trace!("fs mknod parent:{}, name:{}, req id:{}", parent, name, req.unique());
         spawn_reply(req.unique(), reply, async move {
             async_impl
                 .mknod(parent, name, mode, gid, uid, umask, rdev)
+                .instrument(debug_span!("mknod"))
                 .await
         });
     }
@@ -572,24 +586,33 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         let uid = req.uid();
         let gid = req.gid();
 
+        trace!("fs mkdir parent:{}, name:{}, req id:{}", parent, name, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.mkdir(parent, name, mode, gid, uid, umask).await
+            async_impl.mkdir(parent, name, mode, gid, uid, umask)
+                .instrument(debug_span!("mkdir"))
+                .await
         });
     }
 
     fn unlink(&mut self, req: &Request, parent: u64, name: &OsStr, reply: ReplyEmpty) {
         let async_impl = self.0.clone();
         let name = name.to_string_lossy().to_string().into();
+        trace!("fs unlink parent:{}, name:{}, req id:{}", parent, name, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.unlink(parent, name).await
+            async_impl.unlink(parent, name)
+                .instrument(debug_span!("unlink"))
+                .await
         });
     }
 
     fn rmdir(&mut self, req: &Request, parent: u64, name: &OsStr, reply: ReplyEmpty) {
         let async_impl = self.0.clone();
         let name = name.to_string_lossy().to_string().into();
+        trace!("fs rmdir parent:{}, name:{}, req id:{}", parent, name, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.rmdir(parent, name).await
+            async_impl.rmdir(parent, name)
+                .instrument(debug_span!("rmdir"))
+                .await
         });
     }
 
@@ -607,8 +630,11 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         let uid = req.uid();
         let gid = req.gid();
 
+        trace!("fs symlink parent:{}, name:{}, req id:{}", parent, name, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.symlink(gid, uid, parent, name, link).await
+            async_impl.symlink(gid, uid, parent, name, link)
+                .instrument(debug_span!("symlink"))
+                .await
         });
     }
 
@@ -625,9 +651,12 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         let async_impl = self.0.clone();
         let name = name.to_string_lossy().to_string().into();
         let newname = newname.to_string_lossy().to_string().into();
+        trace!("fs rename parent:{}, name:{}, newparent:{}, newname:{}, req id:{}"
+            , parent, name, newparent, newname, req.unique());
         spawn_reply(req.unique(), reply, async move {
             async_impl
                 .rename(parent, name, newparent, newname, flags)
+                .instrument(debug_span!("rename"))
                 .await
         });
     }
@@ -642,15 +671,22 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
     ) {
         let async_impl = self.0.clone();
         let newname = newname.to_string_lossy().to_string().into();
+        trace!("fs link ino:{}, newparent:{}, newname:{}, req id:{}"
+            , ino, newparent, newname, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.link(ino, newparent, newname).await
+            async_impl.link(ino, newparent, newname)
+                .instrument(debug_span!("link"))
+                .await
         });
     }
 
     fn open(&mut self, req: &Request, ino: u64, flags: i32, reply: ReplyOpen) {
         let async_impl = self.0.clone();
+        trace!("fs open ino:{}, flags:{}, req id:{}", ino, flags, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.open(ino, flags).await
+            async_impl.open(ino, flags)
+                .instrument(debug_span!("open"))
+                .await
         });
     }
 
@@ -666,9 +702,12 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         reply: ReplyData,
     ) {
         let async_impl = self.0.clone();
+        trace!("fs read ino:{}, fh:{}, offset:{}, size:{}, flags:{}, req id:{}"
+            , ino, fh, offset, size, flags, req.unique());
         spawn_reply(req.unique(), reply, async move {
             async_impl
                 .read(ino, fh, offset, size, flags, lock_owner)
+                .instrument(debug_span!("read"))
                 .await
         });
     }
@@ -687,17 +726,24 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
     ) {
         let async_impl = self.0.clone();
         let data = data.to_owned();
+        trace!("fs write ino:{}, fh:{}, offset:{}, flags:{}, data.len:{}, req id:{}"
+            , ino, fh, offset, flags, data.len(), req.unique());
         spawn_reply(req.unique(), reply, async move {
             async_impl
                 .write(ino, fh, offset, data, write_flags, flags, lock_owner)
+                .instrument(debug_span!("write"))
                 .await
         });
     }
 
     fn flush(&mut self, req: &Request, ino: u64, fh: u64, lock_owner: u64, reply: ReplyEmpty) {
         let async_impl = self.0.clone();
+        trace!("fs flush ino:{}, fh:{}, req id:{}"
+            , ino, fh, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.flush(ino, fh, lock_owner).await
+            async_impl.flush(ino, fh, lock_owner)
+                .instrument(debug_span!("flush"))
+                .await
         });
     }
 
@@ -712,29 +758,45 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         reply: ReplyEmpty,
     ) {
         let async_impl = self.0.clone();
+        trace!("fs release ino:{}, fh:{}, flags:{}, flush:{}, req id:{}"
+            , ino, fh, flags, flush, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.release(ino, fh, flags, lock_owner, flush).await
+            async_impl.release(ino, fh, flags, lock_owner, flush)
+                .instrument(debug_span!("release"))
+                .await
         });
     }
 
     fn fsync(&mut self, req: &Request, ino: u64, fh: u64, datasync: bool, reply: ReplyEmpty) {
         let async_impl = self.0.clone();
+        trace!("fs fsync ino:{}, fh:{}, datasync:{}, req id:{}"
+            , ino, fh, datasync, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.fsync(ino, fh, datasync).await
+            async_impl.fsync(ino, fh, datasync)
+                .instrument(debug_span!("fsync"))
+                .await
         });
     }
 
     fn opendir(&mut self, req: &Request, ino: u64, flags: i32, reply: ReplyOpen) {
         let async_impl = self.0.clone();
+        trace!("fs opendir ino:{}, flags:{}, req id:{}"
+            , ino, flags, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.opendir(ino, flags).await
+            async_impl.opendir(ino, flags)
+                .instrument(debug_span!("opendir"))
+                .await
         });
     }
 
     fn readdir(&mut self, req: &Request, ino: u64, fh: u64, offset: i64, reply: ReplyDirectory) {
         let async_impl = self.0.clone();
+        trace!("fs readdir ino:{}, fh:{}, offset:{}, req id:{}"
+            , ino, fh, offset, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.readdir(ino, fh, offset).await
+            async_impl.readdir(ino, fh, offset)
+                .instrument(debug_span!("readdir"))
+                .await
         });
     }
 
@@ -747,24 +809,36 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         reply: ReplyDirectoryPlus,
     ) {
         let async_impl = self.0.clone();
+        trace!("fs readdirplus ino:{}, fh:{}, offset:{}, req id:{}"
+            , ino, fh, offset, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.readdirplus(ino, fh, offset).await
+            async_impl.readdirplus(ino, fh, offset)
+                .instrument(debug_span!("readdirplus"))
+                .await
         });
     }
 
     fn fsyncdir(&mut self, req: &Request, ino: u64, fh: u64, datasync: bool, reply: ReplyEmpty) {
         let async_impl = self.0.clone();
+        trace!("fs fsyncdir ino:{}, fh:{}, datasync:{}, req id:{}"
+            , ino, fh, datasync, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.fsyncdir(ino, fh, datasync).await
+            async_impl.fsyncdir(ino, fh, datasync)
+                .instrument(debug_span!("fsyncdir"))
+                .await
         });
     }
 
     fn statfs(&mut self, req: &Request, ino: u64, reply: ReplyStatfs) {
         let async_impl = self.0.clone();
+        trace!("fs statfs ino:{}, req id:{}"
+            , ino, req.unique());
         spawn_reply(
             req.unique(),
             reply,
-            async move { async_impl.statfs(ino).await },
+            async move { async_impl.statfs(ino)
+                            .instrument(debug_span!("statfs"))
+                            .await },
         );
     }
 
@@ -781,37 +855,57 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         let async_impl = self.0.clone();
         let name = name.to_string_lossy().to_string().into();
         let value = value.to_owned();
+        trace!("fs setxattr ino:{}, name:{}, flags:{}, req id:{}"
+            , ino, name, flags, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.setxattr(ino, name, value, flags, position).await
+            async_impl.setxattr(ino, name, value, flags, position)
+                .instrument(debug_span!("setxattr"))
+                .await
         });
     }
 
     fn getxattr(&mut self, req: &Request, ino: u64, name: &OsStr, size: u32, reply: ReplyXattr) {
         let async_impl = self.0.clone();
         let name = name.to_string_lossy().to_string().into();
+        trace!("fs getxattr ino:{}, name:{}, size:{}, req id:{}"
+            , ino, name, size, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.getxattr(ino, name, size).await
+            async_impl.getxattr(ino, name, size)
+                .instrument(debug_span!("getxattr"))
+                .await
         });
     }
 
     fn listxattr(&mut self, req: &Request, ino: u64, size: u32, reply: ReplyXattr) {
         let async_impl = self.0.clone();
+        trace!("fs listxattr ino:{}, size:{}, req id:{}"
+            , ino, size, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.listxattr(ino, size).await
+            async_impl.listxattr(ino, size)
+                .instrument(debug_span!("listxattr"))
+                .await
         });
     }
 
     fn removexattr(&mut self, req: &Request, ino: u64, name: &OsStr, reply: ReplyEmpty) {
         let async_impl = self.0.clone();
         let name = name.to_string_lossy().to_string().into();
+        trace!("fs removexattr ino:{}, name:{}, req id:{}"
+            , ino, name, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.removexattr(ino, name).await
+            async_impl.removexattr(ino, name)
+                .instrument(debug_span!("removeattr"))
+                .await
         });
     }
     fn access(&mut self, req: &Request, ino: u64, mask: i32, reply: ReplyEmpty) {
         let async_impl = self.0.clone();
+        trace!("fs access ino:{}, mask:{}, req id:{}"
+            , ino, mask, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.access(ino, mask).await
+            async_impl.access(ino, mask)
+                .instrument(debug_span!("access"))
+                .await
         });
     }
 
@@ -830,9 +924,12 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
 
         let async_impl = self.0.clone();
         let name = name.to_string_lossy().to_string().into();
+        trace!("fs create parent:{}, name:{}, flags:{}, req id:{}"
+            , parent, name, flags, req.unique());
         spawn_reply(req.unique(), reply, async move {
             async_impl
                 .create(uid, gid, parent, name, mode, umask, flags)
+                .instrument(debug_span!("create"))
                 .await
         });
     }
@@ -850,9 +947,12 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         reply: ReplyLock,
     ) {
         let async_impl = self.0.clone();
+        trace!("fs getlk ino:{}, fh:{}, start:{}, end:{}, pid:{}, typ:{}, req id:{}"
+            , ino, fh, start, end, pid, typ, req.unique());
         spawn_reply(req.unique(), reply, async move {
             async_impl
                 .getlk(ino, fh, lock_owner, start, end, typ, pid)
+                .instrument(debug_span!("getlk"))
                 .await
         });
     }
@@ -871,17 +971,24 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         reply: ReplyEmpty,
     ) {
         let async_impl = self.0.clone();
+        trace!("fs setlk ino:{}, fh:{}, start:{}, end:{}, pid:{}, typ:{}, req id:{}"
+            , ino, fh, start, end, pid, typ, req.unique());
         spawn_reply(req.unique(), reply, async move {
             async_impl
                 .setlk(ino, fh, lock_owner, start, end, typ, pid, sleep)
+                .instrument(debug_span!("setlk"))
                 .await
         });
     }
 
     fn bmap(&mut self, req: &Request, ino: u64, blocksize: u32, idx: u64, reply: ReplyBmap) {
         let async_impl = self.0.clone();
+        trace!("fs bmap ino:{}, blocksize:{}, idx:{}, req id:{}"
+            , ino, blocksize, idx, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.bmap(ino, blocksize, idx).await
+            async_impl.bmap(ino, blocksize, idx)
+                .instrument(debug_span!("bmap"))
+                .await
         });
     }
 
@@ -896,8 +1003,12 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         reply: ReplyEmpty,
     ) {
         let async_impl = self.0.clone();
+        trace!("fs fallocate ino:{}, fh:{}, offset:{}, length:{}, mod:{}, req id:{}"
+            , ino, fh, offset, length, mode, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.fallocate(ino, fh, offset, length, mode).await
+            async_impl.fallocate(ino, fh, offset, length, mode)
+                .instrument(debug_span!("fallocate"))
+                .await
         });
     }
 
@@ -911,8 +1022,12 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         reply: ReplyLseek,
     ) {
         let async_impl = self.0.clone();
+        trace!("fs lseek ino:{}, fh:{}, offset:{}, whence:{}, req id:{}"
+            , ino, fh, offset, whence, req.unique());
         spawn_reply(req.unique(), reply, async move {
-            async_impl.lseek(ino, fh, offset, whence).await
+            async_impl.lseek(ino, fh, offset, whence)
+                .instrument(debug_span!("lseek"))
+                .await
         });
     }
 
@@ -930,11 +1045,15 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
         reply: ReplyWrite,
     ) {
         let async_impl = self.0.clone();
+        trace!("fs copy_file_range ino_in:{}, fh_in:{}, offset_in:{}, ino_out:{}, fh_out:{}, \
+            offset_out:{}, len:{}, flags:{}, req id:{}"
+            , ino_in, fh_in, offset_in, ino_out, fh_out, offset_out, len, flags, req.unique());
         spawn_reply(req.unique(), reply, async move {
             async_impl
                 .copy_file_range(
                     ino_in, fh_in, offset_in, ino_out, fh_out, offset_out, len, flags,
                 )
+                .instrument(debug_span!("copy_file_range"))
                 .await
         });
     }

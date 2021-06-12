@@ -1,8 +1,10 @@
+#![type_length_limit="2861949"]
 use clap::{crate_version, App, Arg};
-use tracing_subscriber::EnvFilter;
 
 use tifs::mount_tifs;
 use tifs::MountOption;
+use tracing_subscriber::{layer::SubscriberExt, registry::Registry};
+use tracing_libatrace as tracing_atrace;
 
 #[async_std::main]
 async fn main() {
@@ -38,19 +40,20 @@ async fn main() {
         )
         .get_matches();
 
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .try_init()
-        .unwrap();
+    setup_global_subscriber();
 
     let endpoints: Vec<&str> = matches
         .values_of("pd")
         .unwrap_or_default()
         .to_owned()
         .collect();
-
     let mountpoint: String = matches.value_of("mount-point").unwrap().to_string();
     let options = MountOption::to_vec(matches.values_of("options").unwrap_or_default());
-
     mount_tifs(mountpoint, endpoints, options).await.unwrap();
+}
+
+fn setup_global_subscriber() {
+    let layer = tracing_atrace::layer().unwrap().with_data_field(Option::Some("data".to_string()));
+    let subscriber = Registry::default().with(layer);
+    tracing::subscriber::set_global_default(subscriber).unwrap();
 }
