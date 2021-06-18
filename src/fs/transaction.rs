@@ -452,7 +452,7 @@ impl Txn {
         inode.ctime = SystemTime::now();
         inode.set_size(inode.size.max(target), self.block_size);
         self.save_inode(&inode.into()).await?;
-        trace!("write data: {}", String::from_utf8_lossy(&data));
+        trace!("write data len: {}", data.len());
         Ok(size)
     }
 

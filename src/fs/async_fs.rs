@@ -483,7 +483,7 @@ impl<T: AsyncFileSystem + 'static> Filesystem for AsyncFs<T> {
     fn lookup(&mut self, req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
         let async_impl = self.0.clone();
         let name = name.to_string_lossy().to_string().into();
-        trace!("fs lookup:{}, req id:{}", name, req.unique());
+        trace!("fs lookup:{}, parent:{}, req id:{}", name, parent, req.unique());
         spawn_reply(req.unique(), reply, async move {
             async_impl.lookup(parent, name).instrument(debug_span!("lookup")).await
         });
