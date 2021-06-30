@@ -66,6 +66,9 @@ pub enum FsError {
 
     #[error("block size conflicts: origin({origin}) != new({new})")]
     BlockSizeConflict { origin: u64, new: u64 },
+
+    #[error("index not found")]
+    IndexNotFound,
 }
 
 pub type Result<T> = std::result::Result<T, FsError>;

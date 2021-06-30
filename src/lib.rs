@@ -1,7 +1,6 @@
-#![feature(map_into_keys_values)]
 #![feature(async_closure)]
 #![feature(array_chunks)]
-#![type_length_limit="3831949"]
+#![type_length_limit = "3831949"]
 pub mod fs;
 
 use async_std::fs::read_to_string;

@@ -4,8 +4,8 @@ use std::io::{stdin, stdout, BufRead, BufReader, Write};
 use anyhow::{anyhow, Result};
 use clap::{crate_version, App, Arg};
 use tikv_client::TransactionClient;
-use tracing_subscriber::{layer::SubscriberExt, registry::Registry};
 use tracing_libatrace as tracing_atrace;
+use tracing_subscriber::{layer::SubscriberExt, registry::Registry};
 
 use tifs::fs::inode::Inode;
 use tifs::fs::key::{ScopedKey, ROOT_INODE};
@@ -48,7 +48,9 @@ async fn main() -> Result<()> {
 }
 
 fn setup_global_subscriber() {
-    let layer = tracing_atrace::layer().unwrap().with_data_field(Option::Some("data".to_string()));
+    let layer = tracing_atrace::layer()
+        .unwrap()
+        .with_data_field(Option::Some("data".to_string()));
     let subscriber = Registry::default().with(layer);
     tracing::subscriber::set_global_default(subscriber).unwrap();
 }
