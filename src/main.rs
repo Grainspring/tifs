@@ -1,10 +1,10 @@
-#![type_length_limit="2861949"]
+#![type_length_limit = "2861949"]
 use clap::{crate_version, App, Arg};
 
 use tifs::mount_tifs;
 use tifs::MountOption;
-use tracing_subscriber::{layer::SubscriberExt, registry::Registry};
 use tracing_libatrace as tracing_atrace;
+use tracing_subscriber::{layer::SubscriberExt, registry::Registry};
 
 #[async_std::main]
 async fn main() {
@@ -53,7 +53,9 @@ async fn main() {
 }
 
 fn setup_global_subscriber() {
-    let layer = tracing_atrace::layer().unwrap().with_data_field(Option::Some("data".to_string()));
+    let layer = tracing_atrace::layer()
+        .unwrap()
+        .with_data_field(Option::Some("data".to_string()));
     let subscriber = Registry::default().with(layer);
     tracing::subscriber::set_global_default(subscriber).unwrap();
 }
