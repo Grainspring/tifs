@@ -126,14 +126,6 @@ impl TiFs {
         }
     }
 
-    async fn spin_no_delay<F, T>(&self, f: F) -> Result<T>
-    where
-        T: 'static + Send,
-        F: for<'a> FnMut(&'a TiFs, &'a mut Txn) -> BoxedFuture<'a, T>,
-    {
-        self.spin(None, f).await
-    }
-
     async fn process_txn_local<F, T>(&self, txn: &mut LocalTxn, f: F) -> Result<T>
     where
         T: 'static + Send,
@@ -182,6 +174,16 @@ impl TiFs {
         }
     }
 
+    #[cfg(feature = "kv_store")]
+    async fn spin_no_delay_local<F, T>(&self, f: F) -> Result<T>
+    where
+        T: 'static + Send,
+        F: for<'a> FnMut(&'a TiFs, &'a mut Txn) -> BoxedFuture<'a, T>,
+    {
+        self.spin(None, f).await
+    }
+
+    #[cfg(feature = "mem_store")]
     async fn spin_no_delay_local<F, T>(&self, f: F) -> Result<T>
     where
         T: 'static + Send,
@@ -664,7 +666,7 @@ impl AsyncFileSystem for TiFs {
     }
 
     // TODO: Find an api to calculate total and available space on tikv.
-    /*
+    #[cfg(feature = "kv_store")]
     async fn statfs(&self, _ino: u64) -> Result<StatFs> {
         let bsize = self.block_size as u32;
         let namelen = Self::MAX_NAME_LEN;
@@ -701,8 +703,8 @@ impl AsyncFileSystem for TiFs {
             0,
         ))
     }
-    */
 
+    #[cfg(feature = "mem_store")]
     #[tracing::instrument]
     async fn statfs(&self, _ino: u64) -> Result<StatFs> {
         let bsize = self.block_size as u32;
